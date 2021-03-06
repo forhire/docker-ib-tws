@@ -1,4 +1,4 @@
-FROM ubuntu:xenial 
+FROM ubuntu:20.04
 
 # version can be stable, latest, or beta; arch can be x64 or x86
 ARG version=latest
@@ -18,8 +18,9 @@ RUN apt-get -yq update && \
 
 # Install JRE 1.8 dependencies
 RUN apt-get -yq install --no-install-recommends libglib2.0-0 libxrandr2 libxinerama1 \
-    libgl1-mesa-glx libgl1 libgtk2.0-0 libasound2 libc6 libgif7 libjpeg8 libpng12-0 libpulse0 libx11-6 libxext6 \
-    libxtst6 libxslt1.1 libopenjfx-jni libcanberra-gtk-module
+    libgl1-mesa-glx libgl1 libgtk2.0-0 libasound2 libc6 libgif7 libjpeg8 libpulse0 libx11-6 libxext6 \
+    libxtst6 libxslt1.1 libopenjfx-jni libcanberra-gtk-module \
+  && apt-get install -y wget unzip xvfb libxtst6 libxrender1 libxi6 x11vnc socat software-properties-common iproute2 && apt-get clean && apt-get autoclean
 
 # Include libopenjfx libraries directory in ld.so configuration
 # This ensures they are available to the i4j-installed JRE
@@ -30,7 +31,7 @@ RUN echo " \n\
 RUN ldconfig
 
 # Install avcodec and avformat for multimedia support
-RUN apt-get -yq install --no-install-recommends libavformat-ffmpeg56 libavcodec-ffmpeg56
+RUN apt-get -yq install --no-install-recommends 
 
 # Install a browser and launcher
 RUN apt-get -yq install --no-install-recommends firefox xdg-utils
@@ -73,6 +74,20 @@ RUN echo " \n\
 
 # Copy over the TWS config so that user-supplied defaults are available at first run
 USER root
+RUN mkdir -p /opt/IBController/ && mkdir -p /opt/IBController/Logs && cd /opt/IBController/ && wget -q https://github.com/IbcAlpha/IBC/releases/download/3.8.4-beta.2/IBCLinux-3.8.4-beta.2.zip && unzip ./IBCLinux-3.8.4-beta.2.zip && chmod -R u+x *.sh && chmod -R u+x scripts/*.sh && rm IBCLinux-3.8.4-beta.2.zip && chmod a+w /run
+COPY ./ib/IBController.ini /root/IBController/IBController.ini
+ENV DISPLAY :0
+
+ADD runscript.sh runscript.sh
+ADD ./vnc/xvfb_init /etc/init.d/xvfb
+ADD ./vnc/vnc_init /etc/init.d/vnc
+ADD ./vnc/xvfb-daemon-run /usr/bin/xvfb-daemon-run
+
+RUN chmod -R u+x runscript.sh \
+  && chmod -R 777 /usr/bin/xvfb-daemon-run \
+  && chmod 777 /etc/init.d/xvfb \
+  && chmod 777 /etc/init.d/vnc
+
 COPY jts.ini Jts/
 RUN chown ib-tws:ib-tws Jts/jts.ini
 USER ib-tws
@@ -83,4 +98,5 @@ EXPOSE 7496
 EXPOSE 7497
 
 # Start TWS
-CMD ["Jts/tws"]
+#CMD ["tws/tws"]
+CMD bash runscript.sh
